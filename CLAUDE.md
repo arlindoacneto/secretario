@@ -1,7 +1,7 @@
 # CLAUDE.md — Projeto "Secretária Online"
 
 > Documento de contexto para o assistente (Claude) e para qualquer dev que pegar o projeto.
-> Última atualização: 2026-06-05.
+> Última atualização: 2026-06-07.
 
 ## 1. O que é
 
@@ -74,4 +74,10 @@ S = {
 
 ## 7. Estado atual
 
-Protótipo funcional rodando 100% no cliente, com dados-semente. Nenhum teste automatizado, nenhum backend, nenhum deploy configurado. Próximo passo de maior impacto/menor esforço: **export/import de dados** para eliminar o risco de perda total.
+Protótipo funcional rodando 100% no cliente, com dados-semente. Nenhum teste automatizado, nenhum backend, nenhum deploy configurado. Código sem alterações desde 2026-06-02 (commit `ec8f368`); este CLAUDE.md está versionado no repositório.
+
+## 8. Decisões pendentes (bloqueiam a evolução)
+
+- [ ] **Export/import JSON** — mitigação mínima contra perda total de dados. Recomendado implementar ANTES de qualquer uso real. Ainda não feito.
+- [ ] **Definir o destino do projeto:** (a) protótipo descartável para validar fluxo, (b) produto interno migrando para a plataforma ECM/Workflow da própria Inprint, ou (c) SaaS. Sem essa decisão, qualquer investimento além do export/import corre risco de ser retrabalho.
+- [ ] **README.md vazio** — preencher com instruções mínimas de uso (abrir o HTML no navegador, dados ficam locais).
