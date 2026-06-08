@@ -13,8 +13,8 @@ O domínio dos dados-semente confirma o negócio: ACME (Implantação ECM + GED)
 
 ## 2. Stack e arquitetura
 
-- **Arquivo único:** `secretaria-online.html` (~727 linhas). HTML + CSS + JS vanilla, zero dependências, zero build, zero backend.
-- **Persistência:** `localStorage`, chave `secretaria_v2`. Há migração automática a partir da chave antiga `secretaria_v1` (converte campos `gestor`/`regiao` soltos para o modelo atual de `gestores[]` + `gestorId`).
+- **Arquivo único:** `secretaria-online.html` (~840 linhas). HTML + CSS + JS vanilla, zero dependências, zero build, zero backend.
+- **Persistência:** `localStorage`, chave `secretaria_v3`. Migração automática em cadeia: v3 ← v2 (adiciona `arquivo[]`) ← v1 (converte `gestor`/`regiao` soltos para `gestores[]` + `gestorId`).
 - **Idioma/locale:** pt-BR (datas, moeda BRL, dias/meses em português).
 - **UI:** mobile-first, tema escuro (variáveis CSS em `:root`), navegação por abas fixas no rodapé (Agenda / Tarefas / Funil), botão flutuante "+", modais em overlay, toasts.
 - **Voz:** Web Speech API (`SpeechRecognition`/`webkitSpeechRecognition`), `lang=pt-BR`. Degrada com aviso se o navegador não suportar.
@@ -27,7 +27,8 @@ S = {
   agenda:   [ {id, title, kind, when(ISO), valor?, notes, att[], srcType?, srcId?, fuId?} ],
   tarefas:  [ {id, title, type, prio, status, att[], followups[]} ],
   funil:    [ {id, cliente, projeto, valor, prob, gestorId, fecha(date), att[], followups[]} ],
-  gestores: [ {id, nome, regiao} ]
+  gestores: [ {id, nome, regiao} ],
+  arquivo:  [ {…item original, _src:'agenda'|'tarefas'|'funil', _ts(ISO), _desfecho?:'ganho'|'perdido'} ]
 }
 ```
 
@@ -53,7 +54,11 @@ S = {
 
 **Gestores** — CRUD de gestores e regiões; bloqueia exclusão de gestor que ainda tem negócios.
 
-**Follow-ups + lembretes** — ao registrar um follow-up com "data de retorno", o app **cria automaticamente um lembrete na Agenda** (`kind:'retorno'`) ligado à origem via `srcType`/`srcId`/`fuId`. Excluir o follow-up remove o lembrete; excluir a tarefa/negócio faz cascata nos lembretes.
+**Follow-ups + lembretes** — ao registrar um follow-up com "data de retorno", o app **cria automaticamente um lembrete na Agenda** (`kind:'retorno'`) ligado à origem via `srcType`/`srcId`/`fuId`. Excluir o follow-up remove o lembrete; excluir/arquivar a tarefa/negócio faz cascata nos lembretes.
+
+**Finalização: Arquivar ou Excluir** — todo encerramento passa pelo modal `finoverlay` (`openFinish`): escolha entre **📦 Arquivar** (vai para `S.arquivo` com `_src` + `_ts`) ou **🗑️ Excluir permanentemente** (`hardDelete`). O 🗑️ de todas as visões abre esse modal. No **Funil**, o botão é ✔️ e o modal pede o **desfecho (🏆 Ganho / ❌ Perdido)**, gravado em `_desfecho` — base para análise futura de conversão. No **Kanban**, cards em "Concluído" ganham botão **📦 Arquivar** de 1 clique (sem modal).
+
+**Aba Arquivo (4ª aba)** — lista de itens arquivados ordenada por data, chips de filtro por origem (Agenda/Tarefas/Funil), busca por texto (título, cliente, projeto, notas e follow-ups), tag de desfecho. Ações: **↩️ Restaurar** (volta à lista de origem; se o gestor do negócio não existe mais, cai no primeiro gestor) e **🗑️ excluir permanente** (com `confirm`).
 
 ## 5. Convenções para evoluir o código
 
@@ -61,11 +66,11 @@ S = {
 - Todo dado novo passa por `save()` → `render()`. `render()` chama `renderAgenda/renderTarefas/renderFunil/updateBadges`.
 - Sempre escapar texto do usuário com `esc()` ao injetar em HTML.
 - Datas internas em ISO; exibição via helpers (`fmtDay`, `fmtTime`, `fdate`, `BRL`).
-- Ao mudar o schema, **incrementar a chave** (`secretaria_v3`) e escrever a migração, como já foi feito de v1→v2.
+- Ao mudar o schema, **incrementar a chave** (próxima: `secretaria_v4`) e escrever a migração em cadeia, como já foi feito de v1→v2→v3.
 
 ## 6. Riscos e pontos cegos (honesto — ler antes de evoluir)
 
-1. **PERDA DE DADOS é o risco nº 1.** Tudo vive em `localStorage` de **um navegador, num único aparelho**. Limpar cache, trocar de celular, navegação anônima ou cota estourada = **tudo apaga, sem backup, sem aviso**. Para uma ferramenta que guarda funil real com centenas de milhares de R$ e nomes de clientes, isso é frágil demais para uso sério. Mitigação mínima antes de qualquer uso real: **export/import JSON** (1 botão). Solução adequada: backend/sync.
+1. **PERDA DE DADOS é o risco nº 1 — e o Arquivo o AGRAVOU.** Tudo vive em `localStorage` de **um navegador, num único aparelho**. Limpar cache, trocar de celular, navegação anônima ou cota estourada = **tudo apaga, sem backup, sem aviso**. Com a aba Arquivo, o app agora acumula **histórico permanente** (negócios ganhos/perdidos) no mesmo armazenamento frágil — quanto mais valioso o arquivo, maior o prejuízo de perdê-lo. Mitigação mínima antes de qualquer uso real: **export/import JSON** (1 botão). Solução adequada: backend/sync.
 2. **Anexos estouram a cota.** Arquivos viram base64 dentro do `localStorage` (limite ~5–10 MB no total). Poucos anexos quebram o `save()` silenciosamente. Hoje só arquivos <1,5 MB são guardados de fato; o resto guarda só o nome.
 3. **Parser de linguagem natural é regex e vai errar.** A confirmação obrigatória protege contra lixo, mas adiciona fricção e a classificação automática acerta menos do que parece. Regiões estão hard-coded só para MG/SP.
 4. **É monousuário disfarçado de multiusuário.** Existe "Gestor", mas não há login, permissão nem acesso do próprio gestor ao seu funil. Não escala para equipe nesse formato.
@@ -74,7 +79,7 @@ S = {
 
 ## 7. Estado atual
 
-Protótipo funcional rodando 100% no cliente, com dados-semente. Nenhum teste automatizado, nenhum backend, nenhum deploy configurado. Código sem alterações desde 2026-06-02 (commit `ec8f368`); este CLAUDE.md está versionado no repositório.
+Protótipo funcional rodando 100% no cliente, com dados-semente. Nenhum teste automatizado, nenhum backend, nenhum deploy configurado. **2026-06-07:** implementada a funcionalidade de **finalização com Arquivar/Excluir** + aba Arquivo (schema v3) — sintaxe validada com `node --check` e handlers conferidos; alterações ainda não commitadas.
 
 ## 8. Decisões pendentes (bloqueiam a evolução)
 
